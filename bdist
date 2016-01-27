@@ -70,7 +70,8 @@ fail_if_interactive() {
 
 random_job_name() {
   dd if=/dev/urandom bs=12 count=1 2>/dev/null \
-  | base64
+  | base64 \
+  | tr "+/" "-_"
 }
 
 init_bdist_dir() {
@@ -190,10 +191,16 @@ main() {
     printf "%s\n" "${files[@]}" > "$fofn"
   fi
 
-  # Make sure we're not submitting too many input files
-  if [ "$(wc -l < "$fofn")" -gt "$(get_max_job_array_size)" ]; then
+  # Make sure we're not submitting too many input files (or too few)
+  local file_count=$(wc -l < "$fofn")
+  if [ "$file_count" -gt "$(get_max_job_array_size)" -o "$file_count" -eq "0" ]; then
     # TODO Clean up
-    fail_because "Too many input files to process"
+
+    if [ "$file_count" -eq "0" ]; then
+      fail_because "No input files to process"
+    else
+      fail_because "Too many input files to process"
+    fi
   fi
 
   # TODO
