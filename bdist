@@ -24,6 +24,7 @@ usage() {
 	
 	COMMAND will be run against all the specified FILEs (or a file of
 	filenames, when used with --fofn), distributed across an LSF cluster.
+	Use -C and/or --FOFN (i.e., uppercase) to disable thorough checking.
 	
 	The following bsub(1) options may also be specified and follow the same
 	usage therefrom:
@@ -47,6 +48,8 @@ display_version() {
 	This program comes with ABSOLUTELY NO WARRANTY. This is free software,
 	which you are welcome to redistribute under the conditions of the GNU
 	Public License v3, or later.
+	
+	LSF(R) is a registered trademark of IBM Corporation.
 	EOF
 }
 
@@ -127,41 +130,49 @@ main() {
         exit
         ;;
 
-      "-c")
+      "-c" | "-C")
+        cmd="${2:-}"
+
+        if [ "$1" = "-c" ]; then
+          ! command -v "${cmd%% *}" &>/dev/null && fail_because "Invalid command"
+        fi
+
         shift
-        cmd="${1:-}"
         ;;
 
-      "--fofn")
-        shift
-        fofn="${1:-}"
+      "--fofn" | "--FOFN")
+        fofn="${2:-}"
 
         # Sanity check fofn
         [ ! -f "$fofn" ] && fail_because "Invalid FOFN"
 
-        while read file; do
-          [ ! -f "$file" ] && fail_because "FOFN contains invalid input file: \"$file\""
-        done < "$fofn"
+        if [ "$1" = "--fofn" ]; then
+          while read file; do
+            [ ! -f "$file" ] && fail_because "FOFN contains invalid input file: \"$file\""
+          done < "$fofn"
+        fi
+
+        shift
         ;;
 
       "-J")
         # Job name
-        shift
-        job_name="${1:-}"
+        job_name="${2:-}"
 
         # Sanity check job name
         [[ ! "$job_name" =~ ^[a-zA-Z0-9._-]+$ ]] && fail_because "Invalid job name"
+
+        shift
         ;;
 
       -[MRnq])
         # bsub option passthrough
-        bsub_options+=("$1")
+        bsub_options+=("$1" "\"${2:-}\"")
         shift
-        bsub_options+=("\"${1:-}\"")
         ;;
 
       *)
-        # Anything else we presume to be an file
+        # Anything else we presume to be an input file
         [ ! -f "$1" ] && fail_because "\"$1\" is not a valid input file"
         files+=("$1")
         ;;
@@ -170,9 +181,8 @@ main() {
     shift
   done
   
-  # We must have a genuine command
+  # We must have a command
   [ -z "${cmd:-}" ] && fail_because "No command specified"
-  ! command -v "${cmd%% *}" &>/dev/null && fail_because "Invalid command"
 
   # FOFN > files, we can't have both, but we must have something
   [ -n "${fofn:-}" -a "${#files[@]}" -ne "0" ] && fail_because "Please supply a FOFN or input files, not both"

@@ -50,6 +50,19 @@ blowing the `$ARG_MAX` of your shell. Also note that the number of files
 to process, either directly or through a FOFN, *must* not exceed the LSF
 `MAX_JOB_ARRAY_SIZE` parameter, set in `lsb.params` (default 1000).
 
+### Lazy Mode
+
+By default, the values to the `-c` and `--fofn` flags are checked:
+commands are checked to see if they're actual commands; and each file in
+the FOFN will be checked to see if it actually is a file. The purpose of
+this is to fail early, before submitting potentially erroneous jobs to
+your cluster.
+
+However, a command on your cluster's workers may not be available on the
+dispatch node and a large FOFN will take time to check through, at the
+expense of IO. These checks can therefore be bypassed by using their
+uppercase counterparts: `-C` and `--FOFN`, respectively.
+
 ### Options
 
 You may optionally pass some `bsub`(1) options:
@@ -102,3 +115,5 @@ Public License for more details.
 
 You should have received a copy of the GNU General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
+
+LSF(R) is a registered trademark of IBM Corporation.
