@@ -76,8 +76,8 @@ random_job_name() {
 }
 
 init_bdist_dir() {
-  mkdir -p $BDIST_WORK
-  mkdir -p $BDIST_LOGS
+  mkdir -p "$BDIST_WORK"
+  mkdir -p "$BDIST_LOGS"
 }
 
 get_max_job_array_size() {
@@ -105,40 +105,36 @@ main() {
   # Parse command line arguments
   while (( "$#" )); do
     case "$1" in
-      _run)
+      "_run")
         fail_if_interactive
         # TODO
         exit
         ;;
 
-      _cleanup)
+      "_cleanup")
         fail_if_interactive
         # TODO
         exit
         ;;
 
-      --help)
-        ;&
-      -h)
+      "-h" | "--help")
         usage
         exit
         ;;
 
-      --version)
-        ;&
-      -V)
+      "-V" | "--version")
         display_version
         exit
         ;;
 
-      -c)
+      "-c")
         shift
-        cmd=${1:-}
+        cmd="${1:-}"
         ;;
 
-      --fofn)
+      "--fofn")
         shift
-        fofn=${1:-}
+        fofn="${1:-}"
 
         # Sanity check fofn
         [ ! -f "$fofn" ] && fail_because "Invalid FOFN"
@@ -148,31 +144,35 @@ main() {
         done < "$fofn"
         ;;
 
-      -J)
+      "-J")
+        # Job name
         shift
-        job_name=${1:-}
+        job_name="${1:-}"
 
         # Sanity check job name
-        [[ ! $job_name =~ ^[a-zA-Z0-9._-]+$ ]] && fail_because "Invalid job name"
+        [[ ! "$job_name" =~ ^[a-zA-Z0-9._-]+$ ]] && fail_because "Invalid job name"
         ;;
 
       -[MRnq])
-        bsub_options+=($1)
+        # bsub option passthrough
+        bsub_options+=("$1")
         shift
-        bsub_options+=(\"${1:-}\")
+        bsub_options+=("\"${1:-}\"")
         ;;
 
       *)
         # Anything else we presume to be an file
         [ ! -f "$1" ] && fail_because "\"$1\" is not a valid input file"
-        files+=($1)
+        files+=("$1")
+        ;;
     esac
 
     shift
   done
   
-  # We must have a command
+  # We must have a genuine command
   [ -z "${cmd:-}" ] && fail_because "No command specified"
+  ! command -v "${cmd%% *}" &>/dev/null && fail_because "Invalid command"
 
   # FOFN > files, we can't have both, but we must have something
   [ -n "${fofn:-}" -a "${#files[@]}" -ne "0" ] && fail_because "Please supply a FOFN or input files, not both"
@@ -180,14 +180,14 @@ main() {
 
   # Create random job name, if none specified, and create working dir
   if [ -z "${job_name:-}" ]; then
-    job_name=$(random_job_name)
+    job_name="$(random_job_name)"
   fi
 
   init_bdist_dir
   local working_dir="$BDIST_WORK/$job_name"
-  mkdir $working_dir
+  mkdir "$working_dir"
 
-  # If we're given a set of files, create a FOFN from them
+  # If we're given explicit input files, create a FOFN from them
   if [ -z "${fofn:-}" ]; then
     fofn="$working_dir/fofn"
     printf "%s\n" "${files[@]}" > "$fofn"
@@ -206,7 +206,17 @@ main() {
   fi
 
   # TODO
-  echo "Creating job array \"$job_name\" with $file_count elements"
+  # Submit the job array and the clean up operation
+  echo -n "Creating job array \"$job_name\" with $file_count elements... " \
+  && bsub -J "${job_name}[1-${file_count}]" \
+          -o $LOG \
+          ${bsub_options[@]} \
+          $SOMETHING &>/dev/null \
+  && bsub -J "cleanup_${job_name}" \
+          -w "ended(${job_name})" \
+          $SOMETHING &>/dev/null \
+  && echo "Done!" \
+  || { echo "Failed!"; exit 1; }
 }
 
-main $@
+main "$@"
