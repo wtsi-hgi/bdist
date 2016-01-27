@@ -105,11 +105,15 @@ main() {
         exit
         ;;
 
+      --help)
+        ;&
       -h)
         usage
         exit
         ;;
 
+      --version)
+        ;&
       -v)
         display_version
         exit
@@ -155,11 +159,11 @@ main() {
   done
   
   # We must have a command
-  [ -z "$cmd" ] && fail_because "No command specified"
+  [ -z "${cmd:-}" ] && fail_because "No command specified"
 
   # FOFN > files, we can't have both, but we must have something
-  [ -n "$fofn" -a "${#files[@]}" -ne "0" ] && fail_because "Please supply a FOFN or input files, not both"
-  [ -z "$fofn" -a "${#files[@]}" -eq "0" ] && fail_because "No FOFN or input files specified"
+  [ -n "${fofn:-}" -a "${#files[@]}" -ne "0" ] && fail_because "Please supply a FOFN or input files, not both"
+  [ -z "${fofn:-}" -a "${#files[@]}" -eq "0" ] && fail_because "No FOFN or input files specified"
 
   # TODO
 }
