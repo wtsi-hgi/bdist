@@ -65,6 +65,7 @@ fail_because() {
 
 fail_if_interactive() {
   # FIXME This should trigger whenever not run by bsub
+  # e.g. check LSF environment variables?...
   [ -t 0 -o -t 1 ] && fail_because "Not for interactive use"
 }
 
@@ -92,7 +93,7 @@ get_max_job_array_size() {
 main() {
   local cmd
   local job_name
-  local bsub_options
+  local -a bsub_options
   local fofn
   local -a files
 
@@ -156,8 +157,9 @@ main() {
         ;;
 
       -[MRnq])
-        bsub_options="$bsub_options $1 \"${2:-}\""
+        bsub_options+=($1)
         shift
+        bsub_options+=(\"${1:-}\")
         ;;
 
       *)
@@ -204,6 +206,7 @@ main() {
   fi
 
   # TODO
+  echo "Creating job array \"$job_name\" with $file_count elements"
 }
 
 main $@
