@@ -1,0 +1,167 @@
+#!/bin/bash
+
+# Submit a distributed job to your LSF compute cluster
+# Author: Christopher Harrison <ch12@sanger.ac.uk>
+
+# GPLv3, or later
+# Copyright (c) 2016 Genome Research Ltd.
+
+set -eu -o pipefail
+
+PROGNAME=$(basename "$0")
+#BDIST=$(readlink -f "$0")
+VERSION="0.0.1"
+
+usage() {
+  cat <<-EOF
+	Usage: $PROGNAME -c COMMAND [OPTIONS] (--fofn FILE | FILE ...)
+	       $PROGNAME (-V | --version)
+	       $PROGNAME (-h | --help)
+	
+	COMMAND will be run against all the specified FILEs (or a file of
+	filenames, when used with --fofn), distributed across an LSF cluster.
+	
+	The following bsub(1) options may also be specified and follow the same
+	usage therefrom:
+	
+	  -J JOB_NAME
+	  -M MEM_LIMIT
+	  -R RESOURCE_REQ
+	  -n MIN_CPUS[,MAX_CPUS]
+	  -q QUEUE_NAME
+	
+	Note that JOB_NAME, if specified, must be a simple identifier. If not
+	specified, one will be automatically created.
+	EOF
+}
+
+display_version() {
+  cat <<-EOF
+	bdist v$VERSION
+	Copyright (c) 2016 Genome Research Ltd.
+	
+	This program comes with ABSOLUTELY NO WARRANTY. This is free software,
+	which you are welcome to redistribute under the conditions of the GNU
+	Public License v3, or later.
+	EOF
+}
+
+stderr() {
+  # echo to stderr in ANSI red
+  >&2 echo -e "\033[0;31m$@\033[0m"
+}
+
+fail_because() {
+  local reason=$1
+
+  stderr $reason
+  usage
+  exit 1
+}
+
+fail_if_interactive() {
+  # FIXME This should trigger whenever not run by bsub
+  [ -t 0 -o -t 1 ] && fail_because "Not for interactive use"
+}
+
+init_bdist_dir() {
+  mkdir -p ~/.bdist/{logs,work}
+}
+
+get_max_job_array_size() {
+  # Note \y is GNU Awk specific
+  local default=1000
+
+  bparams -a \
+  | awk -F " *= *" '/\yMAX_JOB_ARRAY_SIZE\y/ { print $2; found = 1 }
+                    END { if (!found) exit 1 }' \
+  || echo $default
+}
+
+main() {
+  local cmd
+  local job_name
+  local bsub_options
+  local fofn
+  local -a files
+
+  if [ "$#" -eq "0" ]; then
+    usage
+    exit 1
+  fi
+
+  # Parse command line arguments
+  while (( "$#" )); do
+    case "$1" in
+      _run)
+        fail_if_interactive
+        # TODO
+        exit
+        ;;
+
+      _cleanup)
+        fail_if_interactive
+        # TODO
+        exit
+        ;;
+
+      -h)
+        usage
+        exit
+        ;;
+
+      -v)
+        display_version
+        exit
+        ;;
+
+      -c)
+        shift
+        cmd=${1:-}
+        ;;
+
+      --fofn)
+        shift
+        fofn=${1:-}
+
+        # Sanity check fofn
+        [ ! -f "$fofn" ] && fail_because "Invalid FOFN"
+
+        while read file; do
+          [ ! -f "$file" ] && fail_because "FOFN contains invalid file: \"$file\""
+        done < "$fofn"
+        ;;
+
+      -J)
+        shift
+        job_name=${1:-}
+
+        # Sanity check job name
+        [[ ! $job_name =~ ^[a-zA-Z0-9._-]+$ ]] && fail_because "Invalid job name"
+        ;;
+
+      -[MRnq])
+        bsub_options="$bsub_options $1 \"${2:-}\""
+        shift
+        ;;
+
+      *)
+        # Anything else we presume to be a file
+        [ ! -f "$1" ] && fail_because "\"$1\" is not a valid file"
+        files+=($1)
+    esac
+
+    shift
+  done
+  
+  # We must have a command
+  [ -z "$cmd" ] && fail_because "No command specified"
+
+  # FOFN > files, we can't have both, but we must have something
+  [ -n "$fofn" -a "${#files[@]}" -ne "0" ] && fail_because "Please supply a FOFN or input files, not both"
+  [ -z "$fofn" -a "${#files[@]}" -eq "0" ] && fail_because "No FOFN or input files specified"
+
+  # TODO
+}
+
+main $@

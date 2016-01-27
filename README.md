@@ -30,7 +30,7 @@ Note that commands with arguments *must* be quoted for the `-c` option.
 
 The files to be processed by the above command may be supplied
 individually at the command line, or by using a FOFN (file of
-filenames) with the `--fofn` option.
+filenames, `EOL` delimited) with the `--fofn` option.
 
 For example:
 
@@ -44,6 +44,11 @@ Note that, if using `find`(1) with `-exec`, then the `+` delimiter
 should be used. If the `;` delimiter were used, it will still work, but
 it will spawn multiple individual jobs, rather than making use of an LSF
 job array.
+
+A FOFN should be used if there are a lot of files to process, to avoid
+blowing the `$ARG_MAX` of your shell. Also note that the number of files
+to process, either directly or through a FOFN, *must* not exceed the LSF
+`MAX_JOB_ARRAY_SIZE` parameter, set in `lsb.params` (default 1000).
 
 ### Options
 
