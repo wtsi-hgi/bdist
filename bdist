@@ -9,8 +9,12 @@
 set -eu -o pipefail
 
 PROGNAME=$(basename "$0")
-#BDIST=$(readlink -f "$0")
+BDIST_BIN=$(readlink -f "$0")
 VERSION="0.0.1"
+
+BDIST_ROOT="$HOME/.bdist"
+BDIST_WORK="$BDIST_ROOT/work"
+BDIST_LOGS="$BDIST_ROOT/logs"
 
 usage() {
   cat <<-EOF
@@ -64,8 +68,14 @@ fail_if_interactive() {
   [ -t 0 -o -t 1 ] && fail_because "Not for interactive use"
 }
 
+random_job_name() {
+  dd if=/dev/urandom bs=12 count=1 2>/dev/null \
+  | base64
+}
+
 init_bdist_dir() {
-  mkdir -p ~/.bdist/{logs,work}
+  mkdir -p $BDIST_WORK
+  mkdir -p $BDIST_LOGS
 }
 
 get_max_job_array_size() {
@@ -132,7 +142,7 @@ main() {
         [ ! -f "$fofn" ] && fail_because "Invalid FOFN"
 
         while read file; do
-          [ ! -f "$file" ] && fail_because "FOFN contains invalid file: \"$file\""
+          [ ! -f "$file" ] && fail_because "FOFN contains invalid input file: \"$file\""
         done < "$fofn"
         ;;
 
@@ -150,8 +160,8 @@ main() {
         ;;
 
       *)
-        # Anything else we presume to be a file
-        [ ! -f "$1" ] && fail_because "\"$1\" is not a valid file"
+        # Anything else we presume to be an file
+        [ ! -f "$1" ] && fail_because "\"$1\" is not a valid input file"
         files+=($1)
     esac
 
@@ -164,6 +174,27 @@ main() {
   # FOFN > files, we can't have both, but we must have something
   [ -n "${fofn:-}" -a "${#files[@]}" -ne "0" ] && fail_because "Please supply a FOFN or input files, not both"
   [ -z "${fofn:-}" -a "${#files[@]}" -eq "0" ] && fail_because "No FOFN or input files specified"
+
+  # Create random job name, if none specified, and create working dir
+  if [ -z "${job_name:-}" ]; then
+    job_name=$(random_job_name)
+  fi
+
+  init_bdist_dir
+  local working_dir="$BDIST_WORK/$job_name"
+  mkdir $working_dir
+
+  # If we're given a set of files, create a FOFN from them
+  if [ -z "${fofn:-}" ]; then
+    fofn="$working_dir/fofn"
+    printf "%s\n" "${files[@]}" > "$fofn"
+  fi
+
+  # Make sure we're not submitting too many input files
+  if [ "$(wc -l < "$fofn")" -gt "$(get_max_job_array_size)" ]; then
+    # TODO Clean up
+    fail_because "Too many input files to process"
+  fi
 
   # TODO
 }
