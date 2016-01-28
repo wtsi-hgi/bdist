@@ -76,9 +76,9 @@ fail_because() {
 }
 
 fail_if_interactive() {
-  # FIXME This should trigger whenever not run by bsub
-  # e.g. check LSF environment variables?...
-  [ -t 0 -o -t 1 ] && fail_because "Not for interactive use"
+  # Rather than checking std{in,out,err} are TTYs, because of piping and
+  # redirection, we only check for some LSF environment variables
+  [ -z "${LSB_JOBID+x}" -a -z "${LSB_QUEUE+x}" ] && fail_because "Not for interactive use"
 }
 
 random_job_name() {
@@ -111,6 +111,7 @@ write_log() {
 
   case "$mode" in
     "submit")
+      # [Element Count]
       class="SUBMIT"
       output="Job array with $3 elements"
       ;;
@@ -121,16 +122,19 @@ write_log() {
       ;;
 
     "start")
+      # [Job Number] [Full Command]
       class="START"
       output="Job $3: $4"
       ;;
 
     "done")
+      # [Job Number]
       class="DONE"
       output="Job $3 completed successfully"
       ;;
 
     "exit")
+      # [Job Number] [Exit Code]
       class="EXIT"
       output="Job $3 exited with code $4"
       ;;
@@ -142,7 +146,7 @@ write_log() {
     
     *)
       class="UNKNOWN"
-      output="${@:3}"
+      output="${@:2}"
       ;;
   esac
 
@@ -185,7 +189,8 @@ main() {
 
       "_cleanup")
         fail_if_interactive
-        # TODO
+        job_name="$2"
+        cleanup "$job_name"
         exit
         ;;
 
@@ -304,7 +309,8 @@ main() {
   echo -n "Submitting clean up job... " \
   && bsub -J "cleanup_${job_name}" \
           -w "ended(${job_name})" \
-          $SOMETHING &>"$working_dir/_z.part" \
+          "$BDIST_BIN _cleanup \"$job_name\"" \
+          &>"$working_dir/_z.part" \
   && write_log "$job_name" submit_cleanup \
   && echo "Done!" \
   || { echo "Failed!"; \
