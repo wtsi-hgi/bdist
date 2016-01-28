@@ -6,7 +6,15 @@
 # GPLv3, or later
 # Copyright (c) 2016 Genome Research Ltd.
 
-set -eu -o pipefail
+if [[ -v LSB_JOBID && -v LSB_QUEUE ]]; then
+  # Rather than checking std{in,out,err} are TTYs, because of piping and
+  # redirection, we only check for some LSF environment variables
+  BSUBBED=1
+  set +e
+else
+  # Interactive jobs should be more picky
+  set -eu -o pipefail
+fi
 
 PROGNAME=$(basename "$0")
 BDIST_BIN=$(readlink -f "$0")
@@ -76,9 +84,7 @@ fail_because() {
 }
 
 fail_if_interactive() {
-  # Rather than checking std{in,out,err} are TTYs, because of piping and
-  # redirection, we only check for some LSF environment variables
-  if [ -z "${LSB_JOBID+x}" -a -z "${LSB_QUEUE+x}" ]; then
+  if [[ ! -v BSUBBED ]]; then
     fail_because "Not for interactive use"
   fi
 }
@@ -167,7 +173,7 @@ run_command() {
   local cmd="$2"
 
   # Make sure the index is set
-  if [ -z "${LSB_JOBINDEX+x}" ]; then
+  if [[ ! -v LSB_JOBINDEX ]]; then
     write_log "$job_name" "fail" "Job index not available"
     exit 1
   fi
