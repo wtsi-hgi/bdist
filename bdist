@@ -10,7 +10,7 @@ set -eu -o pipefail
 
 PROGNAME=$(basename "$0")
 BDIST_BIN=$(readlink -f "$0")
-VERSION="0.0.1"
+VERSION="0.1.0"
 
 BDIST_ROOT="$HOME/.bdist"
 BDIST_WORK="$BDIST_ROOT/work"
@@ -138,6 +138,12 @@ write_log() {
       class="EXIT"
       output="Job $3 exited with code $4"
       ;;
+    
+    "fail")
+      # [Reason]
+      class="FAIL"
+      output="Couldn't start job: $3"
+      ;;
 
     "clean")
       class="CLEANUP"
@@ -153,12 +159,46 @@ write_log() {
   echo -e "${timestamp}\t${class}\t${output}" >> "$log_file"
 }
 
+run_command() {
+  local job_name="$1"
+  local work_dir="$BDIST_WORK/${job_name}"
+  local cmd="$2"
+
+  # Make sure the index is set
+  if [ -z "${LSB_JOBINDEX+x}" ]; then
+    write_log "$job_name" "fail" "Job index not available"
+    exit 1
+  fi
+  
+  local i="$LSB_JOBINDEX"
+  local file="$(sed "${i}q;d" "$work_dir/fofn")"
+
+  # Build command
+  if [[ ! "$cmd" =~ "{}" ]]; then
+    cmd="$cmd {}"
+  fi
+  cmd="$(sed "s#{}#\"$file\"#g" <<< "$cmd")"
+  local -a run_it=($cmd)
+
+  write_log "$job_name" "start" "$i" "$cmd"
+
+  ${run_it[@]}
+  local exit_code="$?"
+
+  if [ "$exit_code" -eq "0" ]; then
+    write_log "$job_name" "done" "$i"
+  else
+    write_log "$job_name" "exit" "$i" "$exit_code"
+  fi
+  exit "$exit_code"
+}
+
 cleanup() {
   local job_name="$1"
   local log_file="$BDIST_LOGS/${job_name}.log"
   local work_dir="$BDIST_WORK/${job_name}"
 
-  write_log "$job_name" clean
+  write_log "$job_name" "clean"
 
   find "$work_dir" -maxdepth 1 -type f -name "*.part" \
   | xargs cat >> "$log_file"
@@ -173,17 +213,16 @@ main() {
   local fofn
   local -a files
 
-  if [ "$#" -eq "0" ]; then
-    usage
-    exit 1
-  fi
+  [ "$#" -eq "0" ] && fail_because "No arguments provided"
 
   # Parse command line arguments
   while (( "$#" )); do
     case "$1" in
       "_run")
         fail_if_interactive
-        # TODO
+        job_name="$2"
+        cmd="$3"
+        run_command "$job_name" "$cmd"
         exit
         ;;
 
@@ -296,10 +335,10 @@ main() {
   # Submit the job array
   echo -n "Submitting job array \"$job_name\" with $file_count elements... " \
   && bsub -J "${job_name}[1-${file_count}]" \
-          -o $LOG \
+          -o "$working_dir/%I.part" \
           ${bsub_options[@]} \
-          $SOMETHING &>"$working_dir/_a.part" \
-  && write_log "$job_name" submit $file_count \
+          "$BDIST_BIN _run \"$job_name\" \"${cmd}\"" &>"$working_dir/_a.part" \
+  && write_log "$job_name" "submit" $file_count \
   && echo "Done!" \
   || { echo "Failed!"; \
        cleanup "$job_name"; \
@@ -309,9 +348,10 @@ main() {
   echo -n "Submitting clean up job... " \
   && bsub -J "cleanup_${job_name}" \
           -w "ended(${job_name})" \
+          -o /dev/null \
           "$BDIST_BIN _cleanup \"$job_name\"" \
           &>"$working_dir/_z.part" \
-  && write_log "$job_name" submit_cleanup \
+  && write_log "$job_name" "submit_cleanup" \
   && echo "Done!" \
   || { echo "Failed!"; \
        stderr "Looks like you're cleaning things up manually..."; \
