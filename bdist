@@ -78,7 +78,9 @@ fail_because() {
 fail_if_interactive() {
   # Rather than checking std{in,out,err} are TTYs, because of piping and
   # redirection, we only check for some LSF environment variables
-  [ -z "${LSB_JOBID+x}" -a -z "${LSB_QUEUE+x}" ] && fail_because "Not for interactive use"
+  if [ -z "${LSB_JOBID+x}" -a -z "${LSB_QUEUE+x}" ]; then
+    fail_because "Not for interactive use"
+  fi
 }
 
 random_job_name() {
@@ -177,7 +179,7 @@ run_command() {
   if [[ ! "$cmd" =~ "{}" ]]; then
     cmd="$cmd {}"
   fi
-  cmd="$(sed "s#{}#\"$file\"#g" <<< "$cmd")"
+  cmd="$(sed "s#{}#$file#g" <<< "$cmd")"
   local -a run_it=($cmd)
 
   write_log "$job_name" "start" "$i" "$cmd"
@@ -336,7 +338,7 @@ main() {
   echo -n "Submitting job array \"$job_name\" with $file_count elements... " \
   && bsub -J "${job_name}[1-${file_count}]" \
           -o "$working_dir/%I.part" \
-          ${bsub_options[@]} \
+          ${bsub_options[@]:-} \
           "$BDIST_BIN _run \"$job_name\" \"${cmd}\"" &>"$working_dir/_a.part" \
   && write_log "$job_name" "submit" $file_count \
   && echo "Done!" \
