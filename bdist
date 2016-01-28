@@ -93,6 +93,66 @@ get_max_job_array_size() {
   || echo $default
 }
 
+write_log() {
+  local log_file="$BDIST_LOGS/$1.log"
+  local mode="$2"
+  local timestamp="$(date +%Y%m%d%H%M%S%z)"
+  local class
+  local output
+
+  case "$mode" in
+    "submit")
+      class="SUBMIT"
+      output="Job array with $3 elements"
+      ;;
+
+    "submit_cleanup")
+      class="SUBMIT"
+      output="Clean up job"
+      ;;
+
+    "start")
+      class="START"
+      output="Job $3: $4"
+      ;;
+
+    "done")
+      class="DONE"
+      output="Job $3 completed successfully"
+      ;;
+
+    "exit")
+      class="EXIT"
+      output="Job $3 exited with code $4"
+      ;;
+
+    "clean")
+      class="CLEANUP"
+      output="Cleaning up"
+      ;;
+    
+    *)
+      class="UNKNOWN"
+      output="${@:3}"
+      ;;
+  esac
+
+  echo -e "${timestamp}\t${class}\t${output}" >> "$log_file"
+}
+
+cleanup() {
+  local job_name="$1"
+  local log_file="$BDIST_LOGS/${job_name}.log"
+  local work_dir="$BDIST_WORK/${job_name}"
+
+  write_log "$job_name" clean
+
+  find "$work_dir" -maxdepth 1 -type f -name "*.part" \
+  | xargs cat >> "$log_file"
+  
+  rm -rf "$work_dir"
+}
+
 main() {
   local cmd
   local job_name
@@ -197,16 +257,20 @@ main() {
   local working_dir="$BDIST_WORK/$job_name"
   mkdir "$working_dir"
 
-  # If we're given explicit input files, create a FOFN from them
+  # If we're given explicit input files, create a FOFN from them...
+  # ...otherwise, symlink the given FOFN into the working directory
   if [ -z "${fofn:-}" ]; then
     fofn="$working_dir/fofn"
     printf "%s\n" "${files[@]}" > "$fofn"
+  else
+    ln -s "$(readlink -f "$fofn")" "$working_dir/fofn"
+    fofn="$working_dir/fofn"
   fi
 
   # Make sure we're not submitting too many input files (or too few)
   local file_count=$(wc -l < "$fofn")
   if [ "$file_count" -gt "$(get_max_job_array_size)" -o "$file_count" -eq "0" ]; then
-    # TODO Clean up
+    cleanup "$job_name"
 
     if [ "$file_count" -eq "0" ]; then
       fail_because "No input files to process"
@@ -215,18 +279,28 @@ main() {
     fi
   fi
 
-  # TODO
-  # Submit the job array and the clean up operation
-  echo -n "Creating job array \"$job_name\" with $file_count elements... " \
+  # Submit the job array
+  echo -n "Submitting job array \"$job_name\" with $file_count elements... " \
   && bsub -J "${job_name}[1-${file_count}]" \
           -o $LOG \
           ${bsub_options[@]} \
-          $SOMETHING &>/dev/null \
+          $SOMETHING &>"$working_dir/_a.part" \
+  && write_log "$job_name" submit $file_count \
+  && echo "Done!" \
+  || { echo "Failed!"; \
+       cleanup "$job_name"; \
+       exit 1; }
+
+  # Submit the clean up job
+  echo -n "Submitting clean up job... " \
   && bsub -J "cleanup_${job_name}" \
           -w "ended(${job_name})" \
-          $SOMETHING &>/dev/null \
+          $SOMETHING &>"$working_dir/_z.part" \
+  && write_log "$job_name" submit_cleanup \
   && echo "Done!" \
-  || { echo "Failed!"; exit 1; }
+  || { echo "Failed!"; \
+       stderr "Looks like you're cleaning things up manually..."; \
+       exit 1; }
 }
 
 main "$@"
