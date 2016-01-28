@@ -130,9 +130,9 @@ write_log() {
       ;;
 
     "start")
-      # [Job Number] [Full Command]
+      # [Job Number] [Filename]
       class="START"
-      output="Job $3: $4"
+      output="Job $3 on $(hostname): $4"
       ;;
 
     "done")
@@ -170,7 +170,6 @@ write_log() {
 run_command() {
   local job_name="$1"
   local work_dir="$BDIST_WORK/${job_name}"
-  local cmd="$2"
 
   # Make sure the index is set
   if [[ ! -v LSB_JOBINDEX ]]; then
@@ -181,16 +180,9 @@ run_command() {
   local i="$LSB_JOBINDEX"
   local file="$(sed "${i}q;d" "$work_dir/fofn")"
 
-  # Build command
-  if [[ ! "$cmd" =~ "{}" ]]; then
-    cmd="$cmd {}"
-  fi
-  cmd="$(sed "s#{}#$file#g" <<< "$cmd")"
-  local -a run_it=($cmd)
+  write_log "$job_name" "start" "$i" "$file"
 
-  write_log "$job_name" "start" "$i" "$cmd"
-
-  ${run_it[@]}
+  $work_dir/cmd "$file"
   local exit_code="$?"
 
   if [ "$exit_code" -eq "0" ]; then
@@ -229,8 +221,7 @@ main() {
       "_run")
         fail_if_interactive
         job_name="$2"
-        cmd="$3"
-        run_command "$job_name" "$cmd"
+        run_command "$job_name"
         exit
         ;;
 
@@ -315,17 +306,17 @@ main() {
   fi
 
   init_bdist_dir
-  local working_dir="$BDIST_WORK/$job_name"
-  mkdir "$working_dir"
+  local work_dir="$BDIST_WORK/$job_name"
+  mkdir "$work_dir"
 
   # If we're given explicit input files, create a FOFN from them...
   # ...otherwise, symlink the given FOFN into the working directory
   if [ -z "${fofn:-}" ]; then
-    fofn="$working_dir/fofn"
+    fofn="$work_dir/fofn"
     printf "%s\n" "${files[@]}" > "$fofn"
   else
-    ln -s "$(readlink -f "$fofn")" "$working_dir/fofn"
-    fofn="$working_dir/fofn"
+    ln -s "$(readlink -f "$fofn")" "$work_dir/fofn"
+    fofn="$work_dir/fofn"
   fi
 
   # Make sure we're not submitting too many input files (or too few)
@@ -340,12 +331,21 @@ main() {
     fi
   fi
 
+  # Write command script
+  local cmd_script="$work_dir/cmd"
+  echo "#!/bin/bash" > "$cmd_script"
+  if [[ ! "$cmd" =~ "{}" ]]; then
+    cmd="$cmd {}"
+  fi
+  sed "s#{}#\"\$@\"#g" <<< "$cmd" >> "$cmd_script"
+  chmod +x "$cmd_script"
+
   # Submit the job array
   echo -n "Submitting job array \"$job_name\" with $file_count elements... " \
   && bsub -J "${job_name}[1-${file_count}]" \
-          -o "$working_dir/%I.part" \
+          -o "$work_dir/%I.part" \
           ${bsub_options[@]:-} \
-          "$BDIST_BIN _run \"$job_name\" \"${cmd}\"" &>"$working_dir/_a.part" \
+          "$BDIST_BIN _run \"$job_name\"" &>"$work_dir/_a.part" \
   && write_log "$job_name" "submit" $file_count \
   && echo "Done!" \
   || { echo "Failed!"; \
@@ -358,7 +358,7 @@ main() {
           -w "ended(${job_name})" \
           -o /dev/null \
           "$BDIST_BIN _cleanup \"$job_name\"" \
-          &>"$working_dir/_z.part" \
+          &>"$work_dir/_z.part" \
   && write_log "$job_name" "submit_cleanup" \
   && echo "Done!" \
   || { echo "Failed!"; \
