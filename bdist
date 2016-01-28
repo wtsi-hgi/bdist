@@ -63,16 +63,14 @@ display_version() {
 
 stderr() {
   # echo to stderr
-  # Use ANSI red if we're in a terminal
-  local red="\033[0;31m"
-  local reset="\033[0m"
+  local message="$@"
 
-  if [ ! -t 2 ]; then
-    red=""
-    reset=""
+  if [ -t 2 ]; then
+    # Use ANSI red if we're in a terminal
+    message="\033[0;31m${message}\033[0m"
   fi
 
-  >&2 echo -e "$red$@$reset"
+  >&2 echo -e "$message"
 }
 
 fail_because() {
