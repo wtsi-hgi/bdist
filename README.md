@@ -36,27 +36,29 @@ For example:
 
     bdist -c foo /path/to/some/files* /another/file /{foo,bar}/*.quux
 
+    bdist -c foo --fofn /path/to/my.fofn
+
     find /some/path -type f -name "*.baz" | xargs bdist -c foo
 
     find . -type f -exec bdist -c foo +
 
 Note that, if using `find`(1) with `-exec`, then the `+` delimiter
-should be used. If the `;` delimiter were used, it will still work, but
-it will spawn multiple individual jobs, rather than making use of an LSF
+should be used. If the `;` delimiter were used, it would still work, but
+would spawn multiple individual jobs, rather than making use of an LSF
 job array.
 
 A FOFN should be used if there are a lot of files to process, to avoid
 blowing the `$ARG_MAX` of your shell. Also note that the number of files
-to process, either directly or through a FOFN, *must* not exceed the LSF
+to process, either directly or through a FOFN, *must not* exceed the LSF
 `MAX_JOB_ARRAY_SIZE` parameter, set in `lsb.params` (default 1000).
 
 ### Lazy Mode
 
 By default, the values to the `-c` and `--fofn` flags are checked:
-commands are checked to see if they're actual commands; and each file in
-the FOFN will be checked to see if it actually is a file. The purpose of
-this is to fail early, before submitting potentially erroneous jobs to
-your cluster.
+commands are checked to see if they're valid commands or shell builtins;
+while each file in the FOFN will be checked to see if it actually is a
+file. The purpose of this is to fail early, before submitting
+potentially erroneous jobs to your cluster.
 
 However, a command on your cluster's workers may not be available on the
 dispatch node and a large FOFN will take time to check through, at the
@@ -65,7 +67,7 @@ uppercase counterparts: `-C` and `--FOFN`, respectively.
 
 ### Options
 
-You may optionally pass some `bsub`(1) options:
+You may optionally pass through some `bsub`(1) options:
 
     -J JOB_NAME
     -M MEM_LIMIT
@@ -79,9 +81,10 @@ specified, one will be automatically generated.
 ## Logging
 
 While jobs are running, their working directory will contain the output
-of each individual process' output in `~/.bdist/work/JOB_NAME`. Once the
-entire job array has finished, a clean up job will concatenate the logs
-into `~/.bdist/logs/JOB_NAME.log`.
+of each individual process, amongst other things, in
+`~/.bdist/work/JOB_NAME`. Once the entire job array has finished, a
+clean up job will concatenate the logs into `~/.bdist/logs/JOB_NAME.log`
+and remove the working directory.
 
 ## Example
 
@@ -91,8 +94,8 @@ simply with:
 
     bdist -c "gzip -9f" *.dat
 
-The `-f` flag is used to avoid jobs exiting as failed if the `.gz` file
-already exists.
+gzip's `-f` flag is used to avoid jobs exiting as failed if the `.gz`
+file already exists.
 
 However, we can do better than this by using, for example, `pigz`(1) for
 multicore compression:
