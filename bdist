@@ -18,7 +18,7 @@ fi
 
 PROGNAME=$(basename "$0")
 BDIST_BIN=$(readlink -f "$0")
-VERSION="0.1.0"
+VERSION="0.2.0"
 
 BDIST_ROOT="$HOME/.bdist"
 BDIST_WORK="$BDIST_ROOT/work"
@@ -205,11 +205,14 @@ cleanup() {
   local job_name="$1"
   local log_file="$BDIST_LOGS/${job_name}.log"
   local work_dir="$BDIST_WORK/${job_name}"
+  local br="========================================================================"
 
   write_log "$job_name" "clean"
 
-  find "$work_dir" -maxdepth 1 -type f -name "*.part" \
-  | xargs cat >> "$log_file"
+  for part in $work_dir/*.part; do
+    { echo; echo "$br"; echo; } >> "$log_file"
+    cat "$part" >> "$log_file"
+  done
   
   rm -rf "$work_dir"
 }
