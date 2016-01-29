@@ -18,7 +18,7 @@ fi
 
 PROGNAME=$(basename "$0")
 BDIST_BIN=$(readlink -f "$0")
-VERSION="0.2.0"
+VERSION="0.2.1"
 
 BDIST_ROOT="$HOME/.bdist"
 BDIST_WORK="$BDIST_ROOT/work"
@@ -119,7 +119,7 @@ write_log() {
   local job_name="$1"
   local log_file="$BDIST_LOGS/${job_name}.log"
   local mode="$2"
-  local timestamp="$(date +%Y%m%d%H%M%S%z)"
+  local timestamp="$(date "+%Y/%m/%d %H:%M:%SZ%z")"
   local class
   local output
 
