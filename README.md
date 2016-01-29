@@ -102,6 +102,29 @@ multicore compression:
 
     bdist -c "pigz -9 -f -p 8" -n 8 -R "span[hosts=1]" *.dat
 
+### Advanced Example
+
+When using a FOFN, each line is fed to the command, presumably as a file
+to process. However, in lazy mode, there's no reason for a FOFN to be a
+file of filenames; it could, for example, be a file of database keys, or
+JSON object member names, etc. Then the command takes each of these as
+its input argument:
+
+    bdist -c "process_item \$(jq \".{}\" data.json)" --FOFN json.keys
+
+It is also possible to just use the job index, by either creating a FOFN
+of sequential numbers, or -- if both index *and* key are needed -- by
+referring to the LSF environment variable `$LSB_JOBINDEX`:
+
+    bdist -c process_number --FOFN <(seq 10)
+
+    bdist -c "do_something --id=\$LSB_JOBINDEX -x {}" --FOFN some.keys
+
+Note that dollar signs must be escaped, to avoid your execution shell
+from expanding them. In such cases, it may be wise to consolidate your
+command into a small shell script, which takes the FOFN element as its
+argument and will have access to all [LSF job environment variables](https://www-01.ibm.com/support/knowledgecenter/SSETD4_9.1.3/lsf_config_ref/lsf_envars_job_exec.html).
+
 ## License
 
 Copyright (c) 2016 Genome Research Ltd.
