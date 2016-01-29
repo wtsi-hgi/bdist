@@ -18,7 +18,7 @@ fi
 
 PROGNAME=$(basename "$0")
 BDIST_BIN=$(readlink -f "$0")
-VERSION="0.2.1"
+VERSION="0.2.2"
 
 BDIST_ROOT="$HOME/.bdist"
 BDIST_WORK="$BDIST_ROOT/work"
@@ -205,12 +205,18 @@ cleanup() {
   local job_name="$1"
   local log_file="$BDIST_LOGS/${job_name}.log"
   local work_dir="$BDIST_WORK/${job_name}"
-  local br="========================================================================"
 
   write_log "$job_name" "clean"
 
+  local rule="========================================================================"
+
+  # FIXME Numerical sorting of bsub outputs, without using $(ls | sort)
   for part in $work_dir/*.part; do
-    { echo; echo "$br"; echo; } >> "$log_file"
+    local part_file=$(basename "$part")
+    local part_num=${part_file%.part}
+    local header="== Job #$part_num $rule"
+
+    { echo; echo "${header:0:72}"; echo; } >> "$log_file"
     cat "$part" >> "$log_file"
   done
   
