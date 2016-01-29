@@ -63,7 +63,7 @@ display_version() {
 
 stderr() {
   # echo to stderr
-  local message="$@"
+  local message="$*"
 
   if [ -t 2 ]; then
     # Use ANSI red if we're in a terminal
@@ -76,7 +76,7 @@ stderr() {
 fail_because() {
   local reason=$1
 
-  stderr $reason
+  stderr "$reason"
   usage
   exit 1
 }
@@ -158,7 +158,7 @@ write_log() {
     
     *)
       class="UNKNOWN"
-      output="${@:2}"
+      output="${*:2}"
       ;;
   esac
 
@@ -180,7 +180,7 @@ run_command() {
 
   write_log "$job_name" "start" "$i" "$file"
 
-  $work_dir/cmd "$file"
+  "$work_dir/cmd" "$file"
   local exit_code="$?"
 
   if [ "$exit_code" -eq "0" ]; then
@@ -257,7 +257,7 @@ main() {
         [ ! -f "$fofn" ] && fail_because "Invalid FOFN"
 
         if [ "$1" = "--fofn" ]; then
-          while read file; do
+          while read -r file; do
             [ ! -f "$file" ] && fail_because "FOFN contains invalid input file: \"$file\""
           done < "$fofn"
         fi
@@ -295,8 +295,8 @@ main() {
   [ -z "${cmd:-}" ] && fail_because "No command specified"
 
   # FOFN > files, we can't have both, but we must have something
-  [ -n "${fofn:-}" -a "${#files[@]}" -ne "0" ] && fail_because "Please supply a FOFN or input files, not both"
-  [ -z "${fofn:-}" -a "${#files[@]}" -eq "0" ] && fail_because "No FOFN or input files specified"
+  [ -n "${fofn:-}" ] && [ "${#files[@]}" -ne "0" ] && fail_because "Please supply a FOFN or input files, not both"
+  [ -z "${fofn:-}" ] && [ "${#files[@]}" -eq "0" ] && fail_because "No FOFN or input files specified"
 
   # Create random job name, if none specified, and create working dir
   if [ -z "${job_name:-}" ]; then
@@ -319,7 +319,7 @@ main() {
 
   # Make sure we're not submitting too many input files (or too few)
   local file_count=$(wc -l < "$fofn")
-  if [ "$file_count" -gt "$(get_max_job_array_size)" -o "$file_count" -eq "0" ]; then
+  if [ "$file_count" -gt "$(get_max_job_array_size)" ] || [ "$file_count" -eq "0" ]; then
     cleanup "$job_name"
 
     if [ "$file_count" -eq "0" ]; then
@@ -339,29 +339,35 @@ main() {
   chmod +x "$cmd_script"
 
   # Submit the job array
-  echo -n "Submitting job array \"$job_name\" with $file_count elements... " \
-  && bsub -J "${job_name}[1-${file_count}]" \
+  echo -n "Submitting job array \"$job_name\" with $file_count elements... "
+  if bsub -J "${job_name}[1-${file_count}]" \
           -o "$work_dir/%I.part" \
           ${bsub_options[@]:-} \
-          "$BDIST_BIN _run \"$job_name\"" &>"$work_dir/_a.part" \
-  && write_log "$job_name" "submit" $file_count \
-  && echo "Done!" \
-  || { echo "Failed!"; \
-       cleanup "$job_name"; \
-       exit 1; }
+          "$BDIST_BIN _run \"$job_name\"" &>"$work_dir/_a.part"
+  then
+    write_log "$job_name" "submit" "$file_count"
+    echo "Done!"
+  else
+    echo "Failed!"
+    cleanup "$job_name"
+    exit 1
+  fi
 
   # Submit the clean up job
-  echo -n "Submitting clean up job... " \
-  && bsub -J "cleanup_${job_name}" \
+  echo -n "Submitting clean up job... "
+  if bsub -J "cleanup_${job_name}" \
           -w "ended(${job_name})" \
           -o /dev/null \
           "$BDIST_BIN _cleanup \"$job_name\"" \
-          &>"$work_dir/_z.part" \
-  && write_log "$job_name" "submit_cleanup" \
-  && echo "Done!" \
-  || { echo "Failed!"; \
-       stderr "Looks like you're cleaning things up manually..."; \
-       exit 1; }
+          &>"$work_dir/_z.part"
+  then
+    write_log "$job_name" "submit_cleanup"
+    echo "Done!"
+  else
+    echo "Failed!"
+    stderr "Looks like you're cleaning things up manually..."
+    exit 1
+  fi
 }
 
 main "$@"
