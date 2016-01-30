@@ -26,7 +26,7 @@ BDIST_LOGS="$BDIST_ROOT/logs"
 
 usage() {
   cat <<-EOF
-	Usage: $PROGNAME -c COMMAND [OPTIONS] (--fofn FILE | FILE ...)
+	Usage: $PROGNAME [-c] COMMAND [OPTIONS] (--fofn FILE | FILE ...)
 	       $PROGNAME (-V | --version)
 	       $PROGNAME (-h | --help)
 	
@@ -37,6 +37,7 @@ usage() {
 	The following bsub(1) options may also be specified and follow the same
 	usage therefrom:
 	
+	  -G USER_GROUP
 	  -J JOB_NAME
 	  -M MEM_LIMIT
 	  -R RESOURCE_REQ

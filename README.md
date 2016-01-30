@@ -4,7 +4,7 @@ Submit a distributed job to your LSF compute cluster.
 
 ## Usage
 
-    bdist -c COMMAND [OPTIONS] (--fofn FILE | FILE ...)
+    bdist [-c] COMMAND [OPTIONS] (--fofn FILE | FILE ...)
     
     bdist (-V | --version)  Display the version number
     bdist (-h | --help)     Display the help
@@ -22,9 +22,11 @@ case, the filename *won't* be appended automatically).
 
 For example:
 
-    bdist -c "gzip -9 < {} > {}.gz" *
+    bdist "gzip -9 < {} > {}.gz" *
 
-Note that commands with arguments *must* be quoted for the `-c` option.
+Note that commands with arguments *must* be quoted. The `-c` flag itself
+is optional, but if it is omitted, then the command *must* be the first
+positional argument.
 
 ### Files
 
@@ -34,18 +36,18 @@ filenames, `EOL` delimited) with the `--fofn` option.
 
 For example:
 
-    bdist -c foo /path/to/some/files* /another/file /{foo,bar}/*.quux
+    bdist foo /path/to/some/files* /another/file /{foo,bar}/*.quux
 
-    bdist -c foo --fofn /path/to/my.fofn
+    bdist foo --fofn /path/to/my.fofn
 
-    find /some/path -type f -name "*.baz" | xargs bdist -c foo
+    find /some/path -type f -name "*.baz" | xargs bdist foo
 
-    find . -type f -exec bdist -c foo +
+    find . -type f -exec bdist foo +
 
-Note that, if using `find`(1) with `-exec`, then the `+` delimiter
-should be used. If the `;` delimiter were used, it would still work, but
-would spawn multiple individual jobs, rather than making use of an LSF
-job array.
+Note that, if using `find`(1) with `-exec`, then the `+` terminator
+should be used. If the `;` terminator were used, it would still work,
+but would spawn multiple individual jobs, rather than making use of an
+LSF job array.
 
 A FOFN should be used if there are a lot of files to process, to avoid
 blowing the `$ARG_MAX` of your shell. Also note that the number of files
@@ -54,11 +56,11 @@ to process, either directly or through a FOFN, *must not* exceed the LSF
 
 ### Lazy Mode
 
-By default, the values to the `-c` and `--fofn` flags are checked:
-commands are checked to see if they're valid commands or shell builtins;
-while each file in the FOFN will be checked to see if it actually is a
-file. The purpose of this is to fail early, before submitting
-potentially erroneous jobs to your cluster.
+By default, the values for the command (or `-c` flag) and `--fofn` flag
+are checked: commands are checked to see if they're valid commands or
+shell builtins; while each file in the FOFN will be checked to see if it
+actually is a file. The purpose of this is to fail early, before
+submitting potentially erroneous jobs to your cluster.
 
 However, a command on your cluster's workers may not be available on the
 dispatch node and a large FOFN will take time to check through, at the
@@ -69,14 +71,17 @@ uppercase counterparts: `-C` and `--FOFN`, respectively.
 
 You may optionally pass through some `bsub`(1) options:
 
+    -G USER_GROUP *
     -J JOB_NAME
     -M MEM_LIMIT
     -R RESOURCE_REQ
     -n MIN_CPUS[,MAX_CPUS]
-    -q QUEUE_NAME
+    -q QUEUE_NAME *
 
 These follow the same usage pattern as `bsub`. If a `JOB_NAME` is not
-specified, one will be automatically generated.
+specified, one will be automatically generated. The options marked with
+an asterisk, above, are passed to both the job array *and* the cleanup
+job.
 
 ## Logging
 
@@ -92,15 +97,15 @@ The original use case for `bdist` was to `gzip`(1) a bunch of large
 files without tying up the head nodes for half a day. We can now do this
 simply with:
 
-    bdist -c "gzip -9f" *.dat
+    bdist "gzip -9f" *.dat
 
-gzip's `-f` flag is used to avoid jobs exiting as failed if the `.gz`
+`gzip`'s `-f` flag is used to avoid jobs exiting as failed if the `.gz`
 file already exists.
 
 However, we can do better than this by using, for example, `pigz`(1) for
 multicore compression:
 
-    bdist -c "pigz -9 -f -p 8" -n 8 -R "span[hosts=1]" *.dat
+    bdist "pigz -9 -f -p 8" -n 8 -R "span[hosts=1]" *.dat
 
 ### Advanced Example
 
@@ -110,15 +115,15 @@ file of filenames; it could, for example, be a file of database keys, or
 JSON object member names, etc. Then the command takes each of these as
 its input argument:
 
-    bdist -c "process_item <(jq \".{}\" data.json)" --FOFN json.keys
+    bdist "process_item <(jq \".{}\" data.json)" --FOFN json.keys
 
 It is also possible to just use the job index, by either creating a FOFN
 of sequential numbers, or -- if both index *and* key are needed -- by
 referring to the LSF environment variable `$LSB_JOBINDEX`:
 
-    bdist -c process_number --FOFN <(seq 10)
+    bdist process_number --FOFN <(seq 10)
 
-    bdist -c "do_something --id=\$LSB_JOBINDEX -x {}" --FOFN some.keys
+    bdist "do_something --id=\$LSB_JOBINDEX -x {}" --FOFN some.keys
 
 Note that dollar signs must be escaped, to avoid your execution shell
 from expanding them; either that, or use single quotes. Better yet, it
