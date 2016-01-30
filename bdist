@@ -82,9 +82,9 @@ fail_because() {
   exit 1
 }
 
-fail_if_interactive() {
+fail_outside_lsb() {
   if [[ ! -v BSUBBED ]]; then
-    fail_because "Not for interactive use"
+    fail_because "This command must only be run within an LSF job environment"
   fi
 }
 
@@ -233,14 +233,14 @@ main() {
   while (( "$#" )); do
     case "$1" in
       "_run")
-        fail_if_interactive
+        fail_outside_lsb
         job_name="$2"
         run_command "$job_name"
         exit
         ;;
 
       "_cleanup")
-        fail_if_interactive
+        fail_outside_lsb
         job_name="$2"
         cleanup "$job_name"
         exit
