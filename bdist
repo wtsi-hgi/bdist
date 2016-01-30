@@ -209,7 +209,7 @@ cleanup() {
   write_log "$job_name" "clean"
 
   local ruler="$(printf "%.s=" {1..72})"
-  for part in $(find "$work_dir" -name "*.part" -printf "%f\n" | sort -g); do
+  for part in $(find "$work_dir" -name "*.part" -printf "%f\n" | sort -n); do
     local part_num="${part%.part}"
     local header="== Job #$part_num $ruler"
 
