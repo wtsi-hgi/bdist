@@ -210,10 +210,15 @@ cleanup() {
   write_log "$job_name" "clean"
 
   local ruler="$(printf "%.s=" {1..72})"
-  for part in $(find "$work_dir" -name "*.part" -printf "%f\n" | sort -n); do
-    local part_num="${part%.part}"
-    local header="== Job #$part_num $ruler"
+  local header
 
+  # Append command
+  header="== Command $ruler"
+  { echo; echo "${header:0:72}"; echo; cat "$work_dir/cmd"; } >> "$log_file"
+
+  # Append LSF log files
+  for part in $(find "$work_dir" -name "*.part" -printf "%f\n" | sort -n); do
+    header="== Job #${part%.part} $ruler"
     { echo; echo "${header:0:72}"; echo; cat "$work_dir/$part"; } >> "$log_file"
   done
   
