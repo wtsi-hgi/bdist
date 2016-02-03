@@ -18,7 +18,7 @@ fi
 
 PROGNAME=$(basename "$0")
 BDIST_BIN=$(readlink -f "$0")
-VERSION="0.2.3"
+VERSION="0.3.0"
 
 BDIST_ROOT="$HOME/.bdist"
 BDIST_WORK="$BDIST_ROOT/work"
@@ -235,6 +235,13 @@ main() {
 
   [ "$#" -eq "0" ] && fail_because "No arguments provided"
 
+  # If the first argument (up to the first space) is a valid command,
+  # and not a special directive, then that's our command
+  if [ "${1:0:1}" != "_" ] && command -v -- "${1%% *}" &>/dev/null; then
+    cmd="${1:-}"
+    shift
+  fi
+
   # Parse command line arguments
   while (( "$#" )); do
     case "$1" in
@@ -266,7 +273,7 @@ main() {
         cmd="${2:-}"
 
         if [ "$1" = "-c" ]; then
-          ! command -v "${cmd%% *}" &>/dev/null && fail_because "Invalid command"
+          ! command -v -- "${cmd%% *}" &>/dev/null && fail_because "Invalid command"
         fi
 
         shift
