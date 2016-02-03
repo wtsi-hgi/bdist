@@ -377,8 +377,8 @@ main() {
   echo -n "Submitting job array \"$job_name\" with $file_count elements... "
   if bsub -J "${job_name}[1-${file_count}]" \
           -o "$work_dir/%I.part" \
-          "${bsub_global[@]:-}" \
-          "${bsub_options[@]:-}" \
+          ${bsub_global[@]:-} \
+          ${bsub_options[@]:-} \
           "$BDIST_BIN _run \"$job_name\"" &>"$work_dir/_run"
   then
     write_log "$job_name" "submit" "$file_count"
@@ -394,7 +394,7 @@ main() {
   if bsub -J "cleanup_${job_name}" \
           -w "ended(${job_name})" \
           -o /dev/null \
-          "${bsub_global[@]:-}" \
+          ${bsub_global[@]:-} \
           "$BDIST_BIN _cleanup \"$job_name\"" \
           &>"$work_dir/_cleanup"
   then
