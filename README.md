@@ -76,7 +76,7 @@ You may optionally pass through some `bsub`(1) options:
     -M MEM_LIMIT
     -R RESOURCE_REQ
     -n MIN_CPUS[,MAX_CPUS]
-    -q QUEUE_NAME *
+    -q QUEUE_NAME
 
 These follow the same usage pattern as `bsub`. If a `JOB_NAME` is not
 specified, one will be automatically generated. The options marked with
