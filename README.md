@@ -109,6 +109,8 @@ However, we can do better than this by using, for example,
 
 ### Advanced Example
 
+**NOTE This is currently untested! Quoting may break things...**
+
 When using a FOFN, each line is fed to the command, presumably as a file
 to process. However, in lazy mode, there's no reason for a FOFN to be a
 file of filenames; it could, for example, be a file of database keys, or
@@ -136,7 +138,7 @@ access to all [LSF job environment variables](https://www-01.ibm.com/support/kno
 
 ## Using JSON
 
-**NOTE This is currently untested!**
+**NOTE This is currently untested! Quoting may break things...**
 
 If you have a command that needs to distribute and iterate over the
 top-level elements of a JSON array or object, the above "advanced usage"
