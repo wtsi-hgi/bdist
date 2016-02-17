@@ -1,0 +1,106 @@
+#!/bin/bash
+
+# Submit a distributed job to your LSF computer cluster from JSON data
+# Author: Christopher Harrison <ch12@sanger.ac.uk>
+
+# GPLv3, or later
+# Copyright (c) 2016 Genome Research Limited
+
+set -eu -o pipefail
+
+PROGNAME="$(basename "$0")"
+BDIST="$(dirname "$0")/bdist"
+JQ="jq"
+
+usage() {
+  cat <<-EOF
+	Usage: $PROGNAME JSONFILE [OPTIONS] COMMAND
+	       $PROGNAME (-V | --version)
+	       $PROGNAME (-h | --help)
+	
+	COMMAND will be run against the top-level elements (of a JSON array or
+	object), as files, from JSONFILE, distributed across an LSF cluster.
+	
+	This is a convenience wrapper to bdist and will passthrough the same
+	options; see "bdist --help" for details. It requires jq to be installed.
+	EOF
+}
+
+display_version() {
+  $BDIST --version
+}
+
+stderr() {
+  # echo to stderr
+  local message="$*"
+
+  if [ -t 2 ]; then
+    # Use ANSI red if we're in a terminal
+    message="\033[0;31m${message}\033[0m"
+  fi
+
+  >&2 echo -e "$message"
+}
+
+fail_because() {
+  local reason="$1"
+
+  stderr "$reason"
+  usage
+  exit 1
+}
+
+is_cmd() {
+  local cmd="$1"
+  command -v -- "$cmd" &>/dev/null
+}
+
+main() {
+  local cmd
+  local json
+  local -a bdist_options
+
+  # Make sure bdist and jq are available
+  ! is_cmd "$BDIST" && fail_because "Couldn't find bdist executable"
+  ! is_cmd "$JQ" && fail_because "Couldn't find jq executable"
+
+  [ "$#" -eq "0" ] && fail_because "No arguments provided"
+
+  # Parse command line arguments
+  case "$1" in
+    "-h" | "--help")
+      usage
+      exit
+      ;;
+
+    "-V" | "--version")
+      display_version
+      exit
+      ;;
+
+    *)
+      [ "$#" -lt "2" ] && fail_because "Not enough arguments provided"
+      
+      json="$1"
+      cmd="${@: -1}"
+
+      if [ "$#" -gt "2" ]; then
+        bdist_options=${@:2:$#-2}
+      fi
+
+      # Check JSON file exists and has keys
+      [ ! -f "$json" ] && fail_because "JSON file does not exist"
+      ! "$JQ" 'keys[]' "$json" &>/dev/null && fail_because "Invalid JSON file"
+
+      # Properly format command
+      if [[ ! "$cmd" =~ "{}" ]]; then
+        cmd="$cmd {}"
+      fi
+      cmd="${cmd//\{\}/<(\"$JQ\" '.[{}]' \"$json\")}"
+
+      "$BDIST" "$cmd" ${bdist_options[@]:-} --FOFN <("jq" 'keys[]' "$json")
+      ;;
+  esac
+}
+
+main "$@"

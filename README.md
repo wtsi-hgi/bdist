@@ -113,9 +113,12 @@ When using a FOFN, each line is fed to the command, presumably as a file
 to process. However, in lazy mode, there's no reason for a FOFN to be a
 file of filenames; it could, for example, be a file of database keys, or
 JSON object member names, etc. Then the command takes each of these as
-its input argument:
+its input argument. For example:
 
     bdist "process_item <(jq \".{}\" data.json)" --FOFN json.keys
+
+(n.b., In the JSON case, a wrapper script is available for convenience;
+see below for details.)
 
 It is also possible to just use the job index, by either creating a FOFN
 of sequential numbers, or -- if both index *and* key are needed -- by
@@ -130,6 +133,23 @@ from expanding them; either that, or use single quotes. Better yet, it
 would be wise to consolidate more complex commands into a simple shell
 script, which takes the FOFN element as its argument and will have
 access to all [LSF job environment variables](https://www-01.ibm.com/support/knowledgecenter/SSETD4_9.1.3/lsf_config_ref/lsf_envars_job_exec.html).
+
+## Using JSON
+
+**NOTE This is currently untested!**
+
+If you have a command that needs to distribute and iterate over the
+top-level elements of a JSON array or object, the above "advanced usage"
+paradigm has been wrapped into a convenience script, using
+[jq](https://stedolan.github.io/jq/) to process the JSON data:
+
+    bdist-json JSONFILE [OPTIONS] COMMAND
+
+Where `JSONFILE` is the JSON file you wish to iterate over, which must
+be of the form of either a single array or object, and `COMMAND` is to
+be executed on a compute node distributing each element from the JSON
+collection. The `OPTIONS` are the same as those for `bdist`, above, and
+are simply passed through.
 
 ## License
 

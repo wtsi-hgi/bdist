@@ -16,9 +16,9 @@ else
   set -eu -o pipefail
 fi
 
-PROGNAME=$(basename "$0")
-BDIST_BIN=$(readlink -f "$0")
-VERSION="0.3.1"
+PROGNAME="$(basename "$0")"
+BDIST_BIN="$(readlink -f "$0")"
+VERSION="0.4.0-untested"
 
 BDIST_ROOT="$HOME/.bdist"
 BDIST_WORK="$BDIST_ROOT/work"
@@ -75,7 +75,7 @@ stderr() {
 }
 
 fail_because() {
-  local reason=$1
+  local reason="$1"
 
   stderr "$reason"
   usage
@@ -86,6 +86,11 @@ fail_outside_lsb() {
   if [[ ! -v BSUBBED ]]; then
     fail_because "This command must only be run within an LSF job environment"
   fi
+}
+
+is_cmd() {
+  local cmd="$1"
+  command -v -- "$cmd" &>/dev/null
 }
 
 random_job_name() {
@@ -240,7 +245,7 @@ main() {
 
   # If the first argument (up to the first space) is a valid command,
   # and not a special directive, then that's our command
-  if [ "${1:0:1}" != "_" ] && command -v -- "${1%% *}" &>/dev/null; then
+  if [ "${1:0:1}" != "_" ] && is_cmd "${1%% *}"; then
     cmd="${1:-}"
     shift
   fi
@@ -276,7 +281,7 @@ main() {
         cmd="${2:-}"
 
         if [ "$1" = "-c" ]; then
-          ! command -v -- "${cmd%% *}" &>/dev/null && fail_because "Invalid command"
+          ! is_cmd "${cmd%% *}" && fail_because "Invalid command"
         fi
 
         shift
@@ -369,11 +374,10 @@ main() {
 
   # Write command script
   local cmd_script="$work_dir/cmd"
-  echo "#!/bin/bash" > "$cmd_script"
   if [[ ! "$cmd" =~ "{}" ]]; then
     cmd="$cmd {}"
   fi
-  sed "s#{}#\"\$*\"#g" <<< "$cmd" >> "$cmd_script"
+  { echo "#!/bin/bash"; echo "${cmd//\{\}/\"\$*\"}"; } > "$cmd_script"
   chmod +x "$cmd_script"
 
   # Submit the job array
