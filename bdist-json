@@ -98,7 +98,7 @@ main() {
       fi
       cmd="${cmd//\{\}/<(\"$JQ\" '.[{}]' \"$json\")}"
 
-      "$BDIST" "$cmd" ${bdist_options[@]:-} --FOFN <("jq" 'keys[]' "$json")
+      "$BDIST" "$cmd" ${bdist_options[@]:-} --FOFN <("$JQ" 'keys[]' "$json")
       ;;
   esac
 }
