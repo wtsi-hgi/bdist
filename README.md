@@ -102,8 +102,8 @@ simply with:
 `gzip`'s `-f` flag is used to avoid jobs exiting as failed if the `.gz`
 file already exists.
 
-However, we can do better than this by using, for example, `pigz`(1) for
-multicore compression:
+However, we can do better than this by using, for example,
+[`pigz`(1)](http://zlib.net/pigz/) for multicore compression:
 
     bdist "pigz -9 -f -p 8" -n 8 -R "span[hosts=1]" *.dat
 
@@ -141,7 +141,7 @@ access to all [LSF job environment variables](https://www-01.ibm.com/support/kno
 If you have a command that needs to distribute and iterate over the
 top-level elements of a JSON array or object, the above "advanced usage"
 paradigm has been wrapped into a convenience script, using
-[jq](https://stedolan.github.io/jq/) to process the JSON data:
+[`jq`(1)](https://stedolan.github.io/jq/) to process the JSON data:
 
     bdist-json JSONFILE [OPTIONS] COMMAND
 
